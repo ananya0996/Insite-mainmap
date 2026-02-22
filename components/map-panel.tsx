@@ -10,7 +10,16 @@ interface OccupancyChoroplethPayload {
   geojson: ChoroplethFeatureCollection;
 }
 
-export function MapPanel() {
+export type MapMode = "housing" | "growth_potential";
+
+interface MapPanelProps {
+  mode: MapMode;
+  selectedZcta: string | null;
+  onZctaSelect: (zcta: string) => void;
+  onZctaDeselect: () => void;
+}
+
+export function MapPanel({ mode, selectedZcta, onZctaSelect, onZctaDeselect }: MapPanelProps) {
   const [payload, setPayload] = useState<OccupancyChoroplethPayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +31,7 @@ export function MapPanel() {
       try {
         const response = await fetch('/api/occupancy-choropleth');
         if (!response.ok) {
-          throw new Error('Failed to load occupancy map data');
+          throw new Error('Failed to load map data');
         }
         const data = (await response.json()) as OccupancyChoroplethPayload;
         setPayload(data);
@@ -36,13 +45,21 @@ export function MapPanel() {
     loadData();
   }, []);
 
+  const title = mode === "housing"
+    ? "US Housing Units Choropleth"
+    : "Growth Potential Index (2024)";
+
+  const subtitle = mode === "housing"
+    ? "Click a pin code to explore feature time-series"
+    : "High-income households aged 25-44 by pin code";
+
   return (
     <div
       className="flex h-full flex-col rounded-2xl overflow-hidden"
       style={{ backgroundColor: "#ffffff", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
     >
       <div
-        className="flex items-center justify-between px-6 py-4"
+        className="flex items-center justify-between px-6 py-3"
         style={{ borderBottom: "1px solid #e3e6ed" }}
       >
         <div className="flex items-center gap-2.5">
@@ -54,19 +71,27 @@ export function MapPanel() {
           </div>
           <div>
             <h2 className="text-sm font-bold" style={{ color: "#1e2533" }}>
-              US Housing Units Choropleth
+              {title}
             </h2>
             <p className="text-xs" style={{ color: "#8b93a7" }}>
-              Pastel heatmap by ZCTA with per-year normalized values
+              {subtitle}
             </p>
           </div>
         </div>
-        <span
-          className="rounded-xl px-3 py-1 text-xs font-medium"
-          style={{ backgroundColor: "#f0f2f7", color: "#8b93a7" }}
-        >
-          Interactive Map
-        </span>
+
+        {selectedZcta ? (
+          <span className="flex items-center gap-1.5 rounded-xl bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+            <MapPin className="h-3 w-3" />
+            PIN {selectedZcta}
+          </span>
+        ) : (
+          <span
+            className="rounded-xl px-3 py-1 text-xs font-medium"
+            style={{ backgroundColor: "#f0f2f7", color: "#8b93a7" }}
+          >
+            Interactive Map
+          </span>
+        )}
       </div>
 
       <div className="relative flex flex-1 overflow-hidden">
@@ -90,6 +115,9 @@ export function MapPanel() {
               geojson={payload.geojson}
               years={payload.years}
               mapboxToken={MAPBOX_TOKEN}
+              mode={mode}
+              onZctaSelect={onZctaSelect}
+              onZctaDeselect={onZctaDeselect}
             />
           )
         )}

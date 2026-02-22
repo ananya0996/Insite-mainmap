@@ -6,6 +6,7 @@ import {
   normalizeZcta,
   parseOccupancyCSV,
 } from "@/lib/occupancy-parser";
+import { loadScorecard } from "@/lib/scorecard-loader";
 
 type FeatureGeometry = {
   type: string;
@@ -136,13 +137,14 @@ export async function loadOccupancyChoroplethPayload(): Promise<OccupancyChoropl
   );
 
   const collection = await shapefile.read(shpAB, dbfAB);
+  const scorecard = await loadScorecard();
 
   const features: ChoroplethFeature[] = [];
   for (const feature of collection.features) {
     const props = (feature.properties ?? {}) as Record<string, unknown>;
     const zcta = getFeatureZcta(props);
     if (!zcta || !feature.geometry) continue;
-    if (!knownZctas.has(zcta)) continue;
+    if (!knownZctas.has(zcta) && !scorecard.has(zcta)) continue;
 
     const featureProperties: Record<string, string | number> = { zcta };
     for (const year of years) {
@@ -151,6 +153,14 @@ export async function loadOccupancyChoroplethPayload(): Promise<OccupancyChoropl
       featureProperties[`o_${year}`] = yearData?.occupied_units ?? 0;
       featureProperties[`v_${year}`] = yearData?.vacant_units ?? 0;
     }
+
+    const sc = scorecard.get(zcta);
+    featureProperties.target_score = sc?.targetScore2024 ?? 0;
+    featureProperties.investment_score = sc?.investmentScore ?? 0;
+    featureProperties.forecast_2030 = sc?.forecastScore2030 ?? 0;
+    featureProperties.forecast_growth = sc?.forecastGrowthPct ?? 0;
+    featureProperties.median_income = sc?.medianIncome2544 ?? 0;
+    featureProperties.vacancy_rate = sc?.vacancyRatePct ?? 0;
 
     features.push({
       type: "Feature",

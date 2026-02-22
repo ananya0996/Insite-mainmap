@@ -1,7 +1,22 @@
+'use client';
+
 import Image from "next/image";
 import { MapPin, BarChart3, TrendingUp, Search } from "lucide-react";
 
-export function DashboardHeader() {
+export type DashboardView = "zip_codes" | "analytics" | "trends";
+
+interface DashboardHeaderProps {
+  activeView: DashboardView;
+  onViewChange: (view: DashboardView) => void;
+}
+
+const NAV_ITEMS: { id: DashboardView; label: string; icon: typeof MapPin }[] = [
+  { id: "zip_codes", label: "Zip Codes", icon: MapPin },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "trends", label: "Trends", icon: TrendingUp },
+];
+
+export function DashboardHeader({ activeView, onViewChange }: DashboardHeaderProps) {
   return (
     <header
       className="flex items-center justify-between px-6 py-3"
@@ -37,27 +52,27 @@ export function DashboardHeader() {
       </div>
 
       <nav className="flex items-center gap-1">
-        <button
-          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
-          style={{ backgroundColor: "#edf2ff", color: "#4a90d9" }}
-        >
-          <MapPin className="h-4 w-4" />
-          <span>Zip Codes</span>
-        </button>
-        <button
-          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-gray-100"
-          style={{ color: "#6b7385" }}
-        >
-          <BarChart3 className="h-4 w-4" />
-          <span>Analytics</span>
-        </button>
-        <button
-          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-gray-100"
-          style={{ color: "#6b7385" }}
-        >
-          <TrendingUp className="h-4 w-4" />
-          <span>Trends</span>
-        </button>
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeView === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onViewChange(item.id)}
+              className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                isActive ? '' : 'hover:bg-gray-100'
+              }`}
+              style={
+                isActive
+                  ? { backgroundColor: "#edf2ff", color: "#4a90d9" }
+                  : { color: "#6b7385" }
+              }
+            >
+              <Icon className="h-4 w-4" />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       <div className="flex items-center gap-3">
