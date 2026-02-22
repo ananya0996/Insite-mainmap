@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Map, { Layer, Source, MapRef } from 'react-map-gl';
-import type { CircleLayer } from 'react-map-gl';
+import type { CircleLayer, FillLayer, LineLayer } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { ZipcodeData } from '@/lib/csv-parser';
 import { Search, ZoomIn, ZoomOut, Home } from 'lucide-react';
+import { fetchMultipleStates } from '@/lib/geojson-loader';
 
 interface MapBoxMapProps {
   data: ZipcodeData[];
@@ -24,6 +25,9 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+  const [zipcodeBoundaries, setZipcodeBoundaries] = useState<Map<string, any>>(new Map());
+  const [loadedStates, setLoadedStates] = useState<Set<string>>(new Set());
+  const [showBoundaries, setShowBoundaries] = useState(false);
 
   // Create GeoJSON from CSV data
   const geojsonData = {
@@ -131,6 +135,32 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
     setCursorPosition(null);
   }, []);
 
+  // Load zipcode boundaries for visible states
+  useEffect(() => {
+    // Start with key states to load initially
+    const initialStates = ['ca', 'ny', 'tx', 'fl', 'il', 'pa', 'oh', 'ga', 'nc', 'mi'];
+    
+    const loadBoundaries = async () => {
+      const statesToLoad = initialStates.filter(state => !loadedStates.has(state));
+      
+      if (statesToLoad.length > 0) {
+        const boundaries = await fetchMultipleStates(statesToLoad);
+        setZipcodeBoundaries(prev => new Map([...prev, ...boundaries]));
+        setLoadedStates(prev => new Set([...prev, ...statesToLoad]));
+      }
+    };
+
+    loadBoundaries();
+  }, []);
+
+  // Merge all GeoJSON boundaries into a single FeatureCollection
+  const mergedBoundaries = {
+    type: 'FeatureCollection' as const,
+    features: Array.from(zipcodeBoundaries.values()).flatMap(
+      geojson => geojson?.features || []
+    )
+  };
+
   // Get color based on score
   const getColor = (score: number): string => {
     if (score >= 90) return '#1e3a8a'; // Dark blue
@@ -204,6 +234,26 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
         </button>
       </div>
 
+      {/* Boundary Toggle */}
+      <div className="absolute right-4 bottom-20 z-10">
+        <button
+          onClick={() => setShowBoundaries(!showBoundaries)}
+          className={`rounded-lg px-4 py-2 text-sm font-medium shadow-lg transition-colors ${
+            showBoundaries 
+              ? 'bg-blue-600 text-white hover:bg-blue-700' 
+              : 'bg-white text-gray-700 hover:bg-gray-50'
+          }`}
+          title="Toggle Zipcode Boundaries"
+        >
+          {showBoundaries ? 'Hide' : 'Show'} Boundaries
+        </button>
+        {loadedStates.size > 0 && (
+          <div className="mt-2 rounded-lg bg-white px-3 py-1.5 text-xs text-gray-600 shadow-lg">
+            Loaded: {loadedStates.size} states
+          </div>
+        )}
+      </div>
+
       {/* Hover Tooltip */}
       {hoveredZipcode && cursorPosition && (
         <div
@@ -268,6 +318,35 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
             }}
           />
         </Source>
+
+        {/* Zipcode Boundary Layers */}
+        {showBoundaries && mergedBoundaries.features.length > 0 && (
+          <Source id="zipcode-boundaries" type="geojson" data={mergedBoundaries}>
+            <Layer
+              id="zipcode-boundary-fill"
+              type="fill"
+              paint={{
+                'fill-color': 'transparent',
+                'fill-opacity': 0
+              }}
+            />
+            <Layer
+              id="zipcode-boundary-line"
+              type="line"
+              paint={{
+                'line-color': '#4a90d9',
+                'line-width': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  4, 0.5,
+                  12, 2
+                ],
+                'line-opacity': 0.6
+              }}
+            />
+          </Source>
+        )}
       </Map>
 
       {/* Legend */}
