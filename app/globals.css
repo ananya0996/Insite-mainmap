@@ -2,30 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: 222 47% 6%;
-  --foreground: 210 20% 95%;
-  --card: 222 41% 10%;
-  --card-foreground: 210 20% 95%;
-  --muted: 222 30% 16%;
-  --muted-foreground: 215 15% 55%;
-  --accent: 187 80% 48%;
-  --accent-foreground: 222 47% 6%;
-  --border: 222 25% 18%;
-  --ring: 187 80% 48%;
-  --primary: 187 80% 48%;
-  --primary-foreground: 222 47% 6%;
-  --radius: 0.625rem;
-}
+@layer base {
+  :root {
+    --background: 222 47% 6%;
+    --foreground: 210 20% 95%;
+    --card: 222 41% 10%;
+    --card-foreground: 210 20% 95%;
+    --muted: 222 30% 16%;
+    --muted-foreground: 215 15% 55%;
+    --accent: 187 80% 48%;
+    --accent-foreground: 222 47% 6%;
+    --border: 222 25% 18%;
+    --ring: 187 80% 48%;
+    --primary: 187 80% 48%;
+    --primary-foreground: 222 47% 6%;
+    --radius: 0.625rem;
+  }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+  * {
+    border-color: hsl(var(--border));
+  }
 
-body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  overflow: hidden;
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    overflow: hidden;
+  }
 }
