@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import Map, { Layer, Source, MapRef } from 'react-map-gl';
+import MapGL, { Layer, Source, MapRef } from 'react-map-gl';
 import type { CircleLayer } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { ZipcodeData } from '@/lib/csv-parser';
@@ -340,7 +340,7 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
       )}
 
       {/* MapBox Map */}
-      <Map
+      <MapGL
         ref={mapRef}
         initialViewState={{
           longitude: USA_CENTER.longitude,
@@ -418,7 +418,7 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
             />
           </Source>
         )}
-      </Map>
+      </MapGL>
 
       {/* Legend */}
       <div className="absolute bottom-4 left-4 z-10 rounded-lg bg-white px-4 py-3 shadow-lg">
