@@ -30,37 +30,105 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
   useEffect(() => {
     const fetchZipcodeGeojson = async () => {
       try {
+        console.log('[v0] Starting to fetch zipcode boundaries...');
+        
         // Create a map of zipcode to overall_score for quick lookup
         const scoreMap = new Map(data.map(d => [d.zipcode, d.overall_score]));
         const countyMap = new Map(data.map(d => [d.zipcode, d.county_name]));
         
-        // Fetch US zipcode boundaries from a public source
-        const response = await fetch('https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/all_us_zipcodes.json');
-        const geojson = await response.json();
+        // Map of zipcode prefixes to state abbreviations
+        const stateMapping: { [key: string]: string } = {
+          '94': 'ca', '95': 'ca', '90': 'ca', '91': 'ca', '92': 'ca', '93': 'ca', '96': 'ca',
+          '10': 'ny', '11': 'ny', '12': 'ny', '13': 'ny', '14': 'ny',
+          '60': 'il', '61': 'il', '62': 'il',
+          '33': 'fl', '34': 'fl', '32': 'fl',
+          '85': 'az', '86': 'az',
+          '78': 'tx', '75': 'tx', '76': 'tx', '77': 'tx', '79': 'tx',
+          '37': 'tn',
+          '28': 'nc',
+          '83': 'id',
+          '98': 'wa',
+          '30': 'ga',
+          '02': 'ma',
+          '80': 'co',
+        };
         
-        // Filter to only include zipcodes we have data for and add overall_score
-        const filteredFeatures = geojson.features
-          .filter((feature: any) => {
-            const zipcode = feature.properties.ZCTA5CE10 || feature.properties.GEOID10 || feature.properties.ZIP;
-            return scoreMap.has(zipcode);
-          })
-          .map((feature: any) => {
-            const zipcode = feature.properties.ZCTA5CE10 || feature.properties.GEOID10 || feature.properties.ZIP;
-            return {
-              ...feature,
-              properties: {
-                ...feature.properties,
-                zipcode,
-                overall_score: scoreMap.get(zipcode) || 0,
-                county_name: countyMap.get(zipcode) || 'Unknown'
-              }
-            };
-          });
-        
-        setZipcodeGeojson({
-          type: 'FeatureCollection',
-          features: filteredFeatures
+        // Get unique states needed
+        const statesNeeded = new Set<string>();
+        data.forEach(d => {
+          const prefix = d.zipcode.substring(0, 2);
+          const state = stateMapping[prefix];
+          if (state) {
+            statesNeeded.add(state);
+          }
         });
+        
+        console.log('[v0] States needed:', Array.from(statesNeeded));
+        
+        // State name mapping for URLs
+        const stateNames: { [key: string]: string } = {
+          'ca': 'california', 'ny': 'new_york', 'il': 'illinois', 'fl': 'florida',
+          'az': 'arizona', 'tx': 'texas', 'tn': 'tennessee', 'nc': 'north_carolina',
+          'id': 'idaho', 'wa': 'washington', 'ga': 'georgia', 'ma': 'massachusetts',
+          'co': 'colorado'
+        };
+        
+        // Fetch all state GeoJSON files
+        const allFeatures: any[] = [];
+        
+        for (const state of statesNeeded) {
+          const stateName = stateNames[state];
+          if (!stateName) continue;
+          
+          const url = `https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/${state}_${stateName}_zip_codes_geo.min.json`;
+          console.log('[v0] Fetching:', url);
+          
+          try {
+            const response = await fetch(url);
+            if (!response.ok) {
+              console.error('[v0] Failed to fetch', state, response.status);
+              continue;
+            }
+            const geojson = await response.json();
+            console.log('[v0] Fetched', state, '- features:', geojson.features?.length);
+            
+            // Filter and add features
+            const stateFeatures = geojson.features
+              .filter((feature: any) => {
+                const zipcode = feature.properties.ZCTA5CE10 || feature.properties.GEOID10?.substring(2);
+                return scoreMap.has(zipcode);
+              })
+              .map((feature: any) => {
+                const zipcode = feature.properties.ZCTA5CE10 || feature.properties.GEOID10?.substring(2);
+                return {
+                  ...feature,
+                  properties: {
+                    ...feature.properties,
+                    zipcode,
+                    overall_score: scoreMap.get(zipcode) || 0,
+                    county_name: countyMap.get(zipcode) || 'Unknown'
+                  }
+                };
+              });
+            
+            allFeatures.push(...stateFeatures);
+            console.log('[v0] Added', stateFeatures.length, 'features from', state);
+          } catch (err) {
+            console.error('[v0] Error fetching state', state, err);
+          }
+        }
+        
+        console.log('[v0] Total features loaded:', allFeatures.length);
+        
+        if (allFeatures.length > 0) {
+          setZipcodeGeojson({
+            type: 'FeatureCollection',
+            features: allFeatures
+          });
+        } else {
+          console.error('[v0] No features loaded, falling back to circles');
+          setZipcodeGeojson(null);
+        }
       } catch (error) {
         console.error('[v0] Error fetching zipcode boundaries:', error);
         // Fallback to point data if boundaries fail to load
