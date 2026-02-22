@@ -24,6 +24,54 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+  const [zipcodeGeojson, setZipcodeGeojson] = useState<any>(null);
+
+  // Fetch zipcode boundaries and merge with score data
+  useEffect(() => {
+    const fetchZipcodeGeojson = async () => {
+      try {
+        // Create a map of zipcode to overall_score for quick lookup
+        const scoreMap = new Map(data.map(d => [d.zipcode, d.overall_score]));
+        const countyMap = new Map(data.map(d => [d.zipcode, d.county_name]));
+        
+        // Fetch US zipcode boundaries from a public source
+        const response = await fetch('https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/all_us_zipcodes.json');
+        const geojson = await response.json();
+        
+        // Filter to only include zipcodes we have data for and add overall_score
+        const filteredFeatures = geojson.features
+          .filter((feature: any) => {
+            const zipcode = feature.properties.ZCTA5CE10 || feature.properties.GEOID10 || feature.properties.ZIP;
+            return scoreMap.has(zipcode);
+          })
+          .map((feature: any) => {
+            const zipcode = feature.properties.ZCTA5CE10 || feature.properties.GEOID10 || feature.properties.ZIP;
+            return {
+              ...feature,
+              properties: {
+                ...feature.properties,
+                zipcode,
+                overall_score: scoreMap.get(zipcode) || 0,
+                county_name: countyMap.get(zipcode) || 'Unknown'
+              }
+            };
+          });
+        
+        setZipcodeGeojson({
+          type: 'FeatureCollection',
+          features: filteredFeatures
+        });
+      } catch (error) {
+        console.error('[v0] Error fetching zipcode boundaries:', error);
+        // Fallback to point data if boundaries fail to load
+        setZipcodeGeojson(null);
+      }
+    };
+
+    if (data.length > 0) {
+      fetchZipcodeGeojson();
+    }
+  }, [data]);
 
   // Create GeoJSON from CSV data
   const geojsonData = {
@@ -131,14 +179,14 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
     setCursorPosition(null);
   }, []);
 
-  // Get color based on score
+  // Get color based on score - white to dark blue gradient
   const getColor = (score: number): string => {
     if (score >= 90) return '#1e3a8a'; // Dark blue
     if (score >= 85) return '#3b82f6'; // Blue
     if (score >= 80) return '#60a5fa'; // Light blue
-    if (score >= 75) return '#fbbf24'; // Yellow
-    if (score >= 70) return '#f97316'; // Orange
-    return '#ef4444'; // Red
+    if (score >= 75) return '#93c5fd'; // Lighter blue
+    if (score >= 70) return '#dbeafe'; // Very light blue
+    return '#f0f9ff'; // Almost white (very pale blue)
   };
 
   return (
@@ -234,40 +282,74 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/light-v11"
         mapboxAccessToken={mapboxToken}
-        interactiveLayerIds={['zipcode-heatmap']}
+        interactiveLayerIds={zipcodeGeojson ? ['zipcode-fill'] : ['zipcode-heatmap']}
         onClick={handleMapClick}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
-        <Source id="zipcode-data" type="geojson" data={geojsonData}>
-          <Layer 
-            id="zipcode-heatmap"
-            type="circle"
-            paint={{
-              'circle-radius': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                4, 8,
-                12, 20
-              ],
-              'circle-color': [
-                'interpolate',
-                ['linear'],
-                ['get', 'overall_score'],
-                70, '#ef4444',
-                75, '#f97316',
-                80, '#fbbf24',
-                85, '#60a5fa',
-                90, '#3b82f6',
-                95, '#1e3a8a'
-              ],
-              'circle-opacity': 0.7,
-              'circle-stroke-width': 1,
-              'circle-stroke-color': '#ffffff'
-            }}
-          />
-        </Source>
+        {zipcodeGeojson ? (
+          // Use polygon boundaries when available
+          <Source id="zipcode-boundaries" type="geojson" data={zipcodeGeojson}>
+            <Layer 
+              id="zipcode-fill"
+              type="fill"
+              paint={{
+                'fill-color': [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'overall_score'],
+                  70, '#f0f9ff',
+                  75, '#dbeafe',
+                  80, '#93c5fd',
+                  85, '#60a5fa',
+                  90, '#3b82f6',
+                  95, '#1e3a8a'
+                ],
+                'fill-opacity': 0.75
+              }}
+            />
+            <Layer 
+              id="zipcode-outline"
+              type="line"
+              paint={{
+                'line-color': '#ffffff',
+                'line-width': 1,
+                'line-opacity': 0.5
+              }}
+            />
+          </Source>
+        ) : (
+          // Fallback to circle markers if boundaries fail to load
+          <Source id="zipcode-data" type="geojson" data={geojsonData}>
+            <Layer 
+              id="zipcode-heatmap"
+              type="circle"
+              paint={{
+                'circle-radius': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  4, 8,
+                  12, 20
+                ],
+                'circle-color': [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'overall_score'],
+                  70, '#f0f9ff',
+                  75, '#dbeafe',
+                  80, '#93c5fd',
+                  85, '#60a5fa',
+                  90, '#3b82f6',
+                  95, '#1e3a8a'
+                ],
+                'circle-opacity': 0.7,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#ffffff'
+              }}
+            />
+          </Source>
+        )}
       </Map>
 
       {/* Legend */}
@@ -275,27 +357,27 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
         <div className="text-xs font-semibold text-gray-900 mb-2">Overall Score</div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#1e3a8a' }} />
+            <div className="h-3 w-3 rounded-full border border-gray-200" style={{ backgroundColor: '#1e3a8a' }} />
             <span className="text-xs text-gray-600">90+</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#3b82f6' }} />
+            <div className="h-3 w-3 rounded-full border border-gray-200" style={{ backgroundColor: '#3b82f6' }} />
             <span className="text-xs text-gray-600">85-90</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#60a5fa' }} />
+            <div className="h-3 w-3 rounded-full border border-gray-200" style={{ backgroundColor: '#60a5fa' }} />
             <span className="text-xs text-gray-600">80-85</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#fbbf24' }} />
+            <div className="h-3 w-3 rounded-full border border-gray-200" style={{ backgroundColor: '#93c5fd' }} />
             <span className="text-xs text-gray-600">75-80</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#f97316' }} />
+            <div className="h-3 w-3 rounded-full border border-gray-200" style={{ backgroundColor: '#dbeafe' }} />
             <span className="text-xs text-gray-600">70-75</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#ef4444' }} />
+            <div className="h-3 w-3 rounded-full border border-gray-200" style={{ backgroundColor: '#f0f9ff' }} />
             <span className="text-xs text-gray-600">&lt;70</span>
           </div>
         </div>
