@@ -5,17 +5,63 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// State abbreviations for all US states
+// State abbreviations and names for all US states
 const states = [
-  'al', 'ak', 'az', 'ar', 'ca', 'co', 'ct', 'de', 'fl', 'ga',
-  'hi', 'id', 'il', 'in', 'ia', 'ks', 'ky', 'la', 'me', 'md',
-  'ma', 'mi', 'mn', 'ms', 'mo', 'mt', 'ne', 'nv', 'nh', 'nj',
-  'nm', 'ny', 'nc', 'nd', 'oh', 'ok', 'or', 'pa', 'ri', 'sc',
-  'sd', 'tn', 'tx', 'ut', 'vt', 'va', 'wa', 'wv', 'wi', 'wy', 'dc'
+  { code: 'al', name: 'alabama' },
+  { code: 'ak', name: 'alaska' },
+  { code: 'az', name: 'arizona' },
+  { code: 'ar', name: 'arkansas' },
+  { code: 'ca', name: 'california' },
+  { code: 'co', name: 'colorado' },
+  { code: 'ct', name: 'connecticut' },
+  { code: 'de', name: 'delaware' },
+  { code: 'fl', name: 'florida' },
+  { code: 'ga', name: 'georgia' },
+  { code: 'hi', name: 'hawaii' },
+  { code: 'id', name: 'idaho' },
+  { code: 'il', name: 'illinois' },
+  { code: 'in', name: 'indiana' },
+  { code: 'ia', name: 'iowa' },
+  { code: 'ks', name: 'kansas' },
+  { code: 'ky', name: 'kentucky' },
+  { code: 'la', name: 'louisiana' },
+  { code: 'me', name: 'maine' },
+  { code: 'md', name: 'maryland' },
+  { code: 'ma', name: 'massachusetts' },
+  { code: 'mi', name: 'michigan' },
+  { code: 'mn', name: 'minnesota' },
+  { code: 'ms', name: 'mississippi' },
+  { code: 'mo', name: 'missouri' },
+  { code: 'mt', name: 'montana' },
+  { code: 'ne', name: 'nebraska' },
+  { code: 'nv', name: 'nevada' },
+  { code: 'nh', name: 'new_hampshire' },
+  { code: 'nj', name: 'new_jersey' },
+  { code: 'nm', name: 'new_mexico' },
+  { code: 'ny', name: 'new_york' },
+  { code: 'nc', name: 'north_carolina' },
+  { code: 'nd', name: 'north_dakota' },
+  { code: 'oh', name: 'ohio' },
+  { code: 'ok', name: 'oklahoma' },
+  { code: 'or', name: 'oregon' },
+  { code: 'pa', name: 'pennsylvania' },
+  { code: 'ri', name: 'rhode_island' },
+  { code: 'sc', name: 'south_carolina' },
+  { code: 'sd', name: 'south_dakota' },
+  { code: 'tn', name: 'tennessee' },
+  { code: 'tx', name: 'texas' },
+  { code: 'ut', name: 'utah' },
+  { code: 'vt', name: 'vermont' },
+  { code: 'va', name: 'virginia' },
+  { code: 'wa', name: 'washington' },
+  { code: 'wv', name: 'west_virginia' },
+  { code: 'wi', name: 'wisconsin' },
+  { code: 'wy', name: 'wyoming' },
+  { code: 'dc', name: 'district_of_columbia' }
 ];
 
 const baseURL = 'https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master';
-const outputDir = path.join(__dirname, '..', 'public', 'geojson');
+const outputDir = path.join(process.cwd(), 'public', 'geojson');
 
 // Create output directory if it doesn't exist
 if (!fs.existsSync(outputDir)) {
@@ -23,25 +69,25 @@ if (!fs.existsSync(outputDir)) {
 }
 
 async function fetchGeoJSON(state) {
-  const url = `${baseURL}/${state}_${state}_zip_codes_geo.min.json`;
-  console.log(`Fetching ${state.toUpperCase()}...`);
+  const url = `${baseURL}/${state.code}_${state.name}_zip_codes_geo.min.json`;
+  console.log(`Fetching ${state.code.toUpperCase()}...`);
   
   try {
     const response = await fetch(url);
     
     if (!response.ok) {
-      console.log(`  ⚠️  ${state.toUpperCase()} not found (${response.status})`);
+      console.log(`  ⚠️  ${state.code.toUpperCase()} not found (${response.status})`);
       return false;
     }
     
     const data = await response.json();
-    const outputPath = path.join(outputDir, `${state}.geojson`);
+    const outputPath = path.join(outputDir, `${state.code}.geojson`);
     
     fs.writeFileSync(outputPath, JSON.stringify(data));
-    console.log(`  ✓ ${state.toUpperCase()} saved successfully`);
+    console.log(`  ✓ ${state.code.toUpperCase()} saved successfully`);
     return true;
   } catch (error) {
-    console.error(`  ✗ Error fetching ${state.toUpperCase()}:`, error.message);
+    console.error(`  ✗ Error fetching ${state.code.toUpperCase()}:`, error.message);
     return false;
   }
 }
