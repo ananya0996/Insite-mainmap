@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import Map, { Layer, Source, MapRef } from 'react-map-gl';
+import Map, { Layer, Source, MapRef, CircleLayer } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { ZipcodeData } from '@/lib/csv-parser';
 import { Search, ZoomIn, ZoomOut, Home } from 'lucide-react';
