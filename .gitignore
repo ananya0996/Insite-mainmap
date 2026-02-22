@@ -1,0 +1,46 @@
+# Node modules
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Production
+build/
+dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Test output
+coverage/
+
+# Turbo / cache
+.turbo/
+.cache/
+
+# Vercel / deployment
+.vercel/
