@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import Map, { Layer, Source, MapRef } from 'react-map-gl';
-import type { CircleLayer } from 'react-map-gl';
+import { useMemo, useRef, useState, useCallback } from 'react';
+import Map, { Layer, Source, MapRef, MapLayerMouseEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { ZipcodeData } from '@/lib/csv-parser';
-import { Search, ZoomIn, ZoomOut, Home } from 'lucide-react';
+import { ZoomIn, ZoomOut, Home } from 'lucide-react';
+import type { ChoroplethFeatureCollection } from '@/lib/occupancy-choropleth';
 
 interface MapBoxMapProps {
-  data: ZipcodeData[];
+  geojson: ChoroplethFeatureCollection;
+  years: number[];
   mapboxToken: string;
 }
 
@@ -18,253 +18,208 @@ const USA_CENTER = {
   zoom: 4
 };
 
-export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
+const FILL_LAYER_ID = 'zcta-fill';
+const OUTLINE_LAYER_ID = 'zcta-outline';
+const INTERACTIVE_LAYERS = [FILL_LAYER_ID];
+
+const LEGEND_STOPS = [
+  { min: 0,      max: 5000,   color: '#f0f4ff', label: '0 – 5K' },
+  { min: 5000,   max: 20000,  color: '#dce6fc', label: '5K – 20K' },
+  { min: 20000,  max: 50000,  color: '#b8ccf8', label: '20K – 50K' },
+  { min: 50000,  max: 100000, color: '#93b2f2', label: '50K – 100K' },
+  { min: 100000, max: 200000, color: '#7196e8', label: '100K – 200K' },
+  { min: 200000, max: Infinity, color: '#5a7fd4', label: '200K+' },
+];
+
+export function MapBoxMap({ geojson, years, mapboxToken }: MapBoxMapProps) {
   const mapRef = useRef<MapRef>(null);
-  const [hoveredZipcode, setHoveredZipcode] = useState<ZipcodeData | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number>(years[years.length - 1]);
+  const [hoveredInfo, setHoveredInfo] = useState<{
+    zcta: string;
+    totalUnits: number;
+    occupiedUnits: number;
+    vacantUnits: number;
+  } | null>(null);
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
-  // Create GeoJSON from CSV data
-  const geojsonData = {
-    type: 'FeatureCollection' as const,
-    features: data.map(item => ({
-      type: 'Feature' as const,
-      geometry: {
-        type: 'Point' as const,
-        coordinates: [item.longitude, item.latitude]
-      },
-      properties: {
-        zipcode: item.zipcode,
-        overall_score: item.overall_score,
-        county_name: item.county_name
-      }
-    }))
-  };
+  const tKey = useMemo(() => `t_${selectedYear}`, [selectedYear]);
+  const oKey = useMemo(() => `o_${selectedYear}`, [selectedYear]);
+  const vKey = useMemo(() => `v_${selectedYear}`, [selectedYear]);
 
-  // Filter suggestions based on search term
-  const suggestions = searchTerm
-    ? data.filter(item => 
-        item.zipcode.startsWith(searchTerm)
-      ).slice(0, 10)
-    : [];
+  const fillLayerId = FILL_LAYER_ID;
+  const outlineLayerId = OUTLINE_LAYER_ID;
 
-  // Handle zipcode search
-  const handleSearchSelect = useCallback((zipcode: string) => {
-    const item = data.find(d => d.zipcode === zipcode);
-    if (item && mapRef.current) {
-      mapRef.current.flyTo({
-        center: [item.longitude, item.latitude],
-        zoom: 12,
-        duration: 2000
-      });
-      setSearchTerm(zipcode);
-      setShowSuggestions(false);
-    }
-  }, [data]);
-
-  // Zoom controls
   const handleZoomIn = useCallback(() => {
-    if (mapRef.current) {
-      mapRef.current.zoomIn();
-    }
+    mapRef.current?.zoomIn();
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    if (mapRef.current) {
-      mapRef.current.zoomOut();
-    }
+    mapRef.current?.zoomOut();
   }, []);
 
   const handleResetZoom = useCallback(() => {
-    if (mapRef.current) {
-      mapRef.current.flyTo({
-        center: [USA_CENTER.longitude, USA_CENTER.latitude],
-        zoom: USA_CENTER.zoom,
-        duration: 2000
-      });
-    }
+    mapRef.current?.flyTo({
+      center: [USA_CENTER.longitude, USA_CENTER.latitude],
+      zoom: USA_CENTER.zoom,
+      duration: 2000,
+    });
   }, []);
 
-  // Handle map click
-  const handleMapClick = useCallback((event: any) => {
-    const features = event.features;
-    if (features && features.length > 0) {
-      const feature = features[0];
-      const coords = feature.geometry.coordinates;
-      
-      if (mapRef.current) {
-        mapRef.current.flyTo({
-          center: coords,
-          zoom: 12,
-          duration: 2000
-        });
-      }
+  const handleMapClick = useCallback((event: MapLayerMouseEvent) => {
+    const feature = event.features?.[0];
+    if (!feature?.geometry || !mapRef.current) return;
+
+    let allCoords: number[][] = [];
+    const geom = feature.geometry;
+
+    if (geom.type === 'Polygon') {
+      const rings = geom.coordinates as number[][][];
+      for (const ring of rings) allCoords = allCoords.concat(ring);
+    } else if (geom.type === 'MultiPolygon') {
+      const polys = geom.coordinates as number[][][][];
+      for (const poly of polys) for (const ring of poly) allCoords = allCoords.concat(ring);
     }
+
+    if (allCoords.length === 0) return;
+
+    let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+    for (const [lng, lat] of allCoords) {
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    }
+
+    mapRef.current.fitBounds(
+      [[minLng, minLat], [maxLng, maxLat]],
+      { padding: 80, duration: 1400, maxZoom: 14 },
+    );
   }, []);
 
-  // Handle mouse move for hover tooltip
-  const handleMouseMove = useCallback((event: any) => {
-    const features = event.features;
-    if (features && features.length > 0) {
-      const feature = features[0];
-      const props = feature.properties;
-      
-      setHoveredZipcode({
-        zipcode: props.zipcode,
-        overall_score: props.overall_score,
-        county_name: props.county_name,
-        latitude: 0,
-        longitude: 0
-      });
-      
-      setCursorPosition({ x: event.point.x, y: event.point.y });
-    } else {
-      setHoveredZipcode(null);
+  const handleMouseMove = useCallback((event: MapLayerMouseEvent) => {
+    const feature = event.features?.[0];
+    if (!feature?.properties) {
+      setHoveredInfo(null);
       setCursorPosition(null);
+      return;
     }
-  }, []);
 
-  // Handle mouse leave
+    const p = feature.properties as Record<string, string | number>;
+    setHoveredInfo({
+      zcta: String(p.zcta ?? ''),
+      totalUnits: Number(p[tKey] ?? 0),
+      occupiedUnits: Number(p[oKey] ?? 0),
+      vacantUnits: Number(p[vKey] ?? 0),
+    });
+    setCursorPosition({ x: event.point.x, y: event.point.y });
+  }, [tKey, oKey, vKey]);
+
   const handleMouseLeave = useCallback(() => {
-    setHoveredZipcode(null);
+    setHoveredInfo(null);
     setCursorPosition(null);
   }, []);
 
-  // Get color based on score
-  const getColor = (score: number): string => {
-    if (score >= 90) return '#1e3a8a'; // Dark blue
-    if (score >= 85) return '#3b82f6'; // Blue
-    if (score >= 80) return '#60a5fa'; // Light blue
-    if (score >= 75) return '#fbbf24'; // Yellow
-    if (score >= 70) return '#f97316'; // Orange
-    return '#ef4444'; // Red
-  };
-
   return (
     <div className="relative h-full w-full">
-      {/* Search Bar */}
-      <div className="absolute left-4 top-4 z-10 w-80">
-        <div className="relative">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search zipcode..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setShowSuggestions(true);
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-4 text-sm shadow-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          {/* Suggestions Dropdown */}
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
-              {suggestions.map((item) => (
-                <button
-                  key={item.zipcode}
-                  onClick={() => handleSearchSelect(item.zipcode)}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
-                >
-                  <div className="font-medium">{item.zipcode}</div>
-                  <div className="text-xs text-gray-500">{item.county_name} - Score: {item.overall_score}</div>
-                </button>
-              ))}
-            </div>
-          )}
+      {/* Year selector */}
+      <div className="absolute left-4 top-4 z-10 rounded-lg bg-white/95 p-3 shadow-lg">
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+          Year
         </div>
+        <select
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(Number(e.target.value))}
+          className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-blue-300"
+        >
+          {years.map((year) => (
+            <option key={year} value={year}>{year}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Zoom Controls */}
+      {/* Zoom controls */}
       <div className="absolute right-4 top-4 z-10 flex flex-col gap-2">
-        <button
-          onClick={handleZoomIn}
-          className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-lg hover:bg-gray-50"
-          title="Zoom In"
-        >
+        <button onClick={handleZoomIn} className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-lg hover:bg-gray-50" title="Zoom In">
           <ZoomIn className="h-5 w-5 text-gray-700" />
         </button>
-        <button
-          onClick={handleZoomOut}
-          className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-lg hover:bg-gray-50"
-          title="Zoom Out"
-        >
+        <button onClick={handleZoomOut} className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-lg hover:bg-gray-50" title="Zoom Out">
           <ZoomOut className="h-5 w-5 text-gray-700" />
         </button>
-        <button
-          onClick={handleResetZoom}
-          className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-lg hover:bg-gray-50"
-          title="Reset View"
-        >
+        <button onClick={handleResetZoom} className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-lg hover:bg-gray-50" title="Reset View">
           <Home className="h-5 w-5 text-gray-700" />
         </button>
       </div>
 
-      {/* Hover Tooltip */}
-      {hoveredZipcode && cursorPosition && (
+      {/* Hover tooltip */}
+      {hoveredInfo && cursorPosition && (
         <div
-          className="pointer-events-none absolute z-20 rounded-lg bg-white px-3 py-2 shadow-lg"
+          className="pointer-events-none absolute z-20 rounded-lg bg-white px-4 py-3 shadow-lg"
           style={{
-            left: `${cursorPosition.x + 10}px`,
-            top: `${cursorPosition.y + 10}px`
+            left: `${cursorPosition.x + 14}px`,
+            top: `${cursorPosition.y + 14}px`,
           }}
         >
-          <div className="text-xs">
-            <div className="font-bold text-gray-900">Zipcode: {hoveredZipcode.zipcode}</div>
-            <div className="text-gray-600">{hoveredZipcode.county_name}</div>
-            <div className="mt-1 font-semibold" style={{ color: getColor(hoveredZipcode.overall_score) }}>
-              Score: {hoveredZipcode.overall_score}
+          <div className="text-xs leading-relaxed">
+            <div className="font-bold text-gray-900">ZCTA: {hoveredInfo.zcta}</div>
+            <div className="text-gray-500">Year: {selectedYear}</div>
+            <div className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+              <span className="text-gray-500">Total units</span>
+              <span className="font-semibold text-gray-800 text-right">{hoveredInfo.totalUnits.toLocaleString()}</span>
+              <span className="text-gray-500">Occupied</span>
+              <span className="font-semibold text-emerald-700 text-right">{hoveredInfo.occupiedUnits.toLocaleString()}</span>
+              <span className="text-gray-500">Vacant</span>
+              <span className="font-semibold text-amber-700 text-right">{hoveredInfo.vacantUnits.toLocaleString()}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* MapBox Map */}
+      {/* Map */}
       <Map
         ref={mapRef}
         initialViewState={{
           longitude: USA_CENTER.longitude,
           latitude: USA_CENTER.latitude,
-          zoom: USA_CENTER.zoom
+          zoom: USA_CENTER.zoom,
         }}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/light-v11"
         mapboxAccessToken={mapboxToken}
-        interactiveLayerIds={['zipcode-heatmap']}
+        interactiveLayerIds={INTERACTIVE_LAYERS}
         onClick={handleMapClick}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
-        <Source id="zipcode-data" type="geojson" data={geojsonData}>
-          <Layer 
-            id="zipcode-heatmap"
-            type="circle"
+        <Source id="zcta-boundaries" type="geojson" data={geojson}>
+          <Layer
+            id={fillLayerId}
+            type="fill"
             paint={{
-              'circle-radius': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                4, 8,
-                12, 20
+              'fill-color': [
+                'step',
+                ['coalesce', ['to-number', ['get', tKey]], 0],
+                LEGEND_STOPS[0].color,
+                LEGEND_STOPS[1].min, LEGEND_STOPS[1].color,
+                LEGEND_STOPS[2].min, LEGEND_STOPS[2].color,
+                LEGEND_STOPS[3].min, LEGEND_STOPS[3].color,
+                LEGEND_STOPS[4].min, LEGEND_STOPS[4].color,
+                LEGEND_STOPS[5].min, LEGEND_STOPS[5].color,
               ],
-              'circle-color': [
-                'interpolate',
-                ['linear'],
-                ['get', 'overall_score'],
-                70, '#ef4444',
-                75, '#f97316',
-                80, '#fbbf24',
-                85, '#60a5fa',
-                90, '#3b82f6',
-                95, '#1e3a8a'
+              'fill-opacity': 0.82,
+            }}
+          />
+          <Layer
+            id={outlineLayerId}
+            type="line"
+            paint={{
+              'line-color': '#d0d8e8',
+              'line-width': [
+                'interpolate', ['linear'], ['zoom'],
+                3, 0.15,
+                8, 0.5,
+                12, 1,
               ],
-              'circle-opacity': 0.7,
-              'circle-stroke-width': 1,
-              'circle-stroke-color': '#ffffff'
+              'line-opacity': 0.8,
             }}
           />
         </Source>
@@ -272,32 +227,16 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
 
       {/* Legend */}
       <div className="absolute bottom-4 left-4 z-10 rounded-lg bg-white px-4 py-3 shadow-lg">
-        <div className="text-xs font-semibold text-gray-900 mb-2">Overall Score</div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#1e3a8a' }} />
-            <span className="text-xs text-gray-600">90+</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#3b82f6' }} />
-            <span className="text-xs text-gray-600">85-90</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#60a5fa' }} />
-            <span className="text-xs text-gray-600">80-85</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#fbbf24' }} />
-            <span className="text-xs text-gray-600">75-80</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#f97316' }} />
-            <span className="text-xs text-gray-600">70-75</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#ef4444' }} />
-            <span className="text-xs text-gray-600">&lt;70</span>
-          </div>
+        <div className="mb-2 text-xs font-semibold text-gray-900">
+          Total Housing Units ({selectedYear})
+        </div>
+        <div className="flex items-center gap-2">
+          {LEGEND_STOPS.map((stop) => (
+            <div key={stop.label} className="flex items-center gap-1">
+              <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: stop.color }} />
+              <span className="text-[11px] text-gray-600">{stop.label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

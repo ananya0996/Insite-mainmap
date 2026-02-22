@@ -3,27 +3,29 @@
 import { MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MapBoxMap } from "./mapbox-map";
-import { parseCSV, ZipcodeData } from "@/lib/csv-parser";
+import type { ChoroplethFeatureCollection } from "@/lib/occupancy-choropleth";
+
+interface OccupancyChoroplethPayload {
+  years: number[];
+  geojson: ChoroplethFeatureCollection;
+}
 
 export function MapPanel() {
-  const [zipcodeData, setZipcodeData] = useState<ZipcodeData[]>([]);
+  const [payload, setPayload] = useState<OccupancyChoroplethPayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // TODO: we know that hardcoding an API key is incredibly stupid, but we are prioritizing successful deployment for a hackathon over debugging deployment issues due to secret management
-  // const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiYWJoaXJhc3RvZ2k4MDAiLCJhIjoiY21seDkzdTh3MGp2eTNkb2oyZWM2ZDZiZCJ9.aBgaZF9WCksZNbiDeXs5DQ';
-  const MAPBOX_TOKEN = 'pk.eyJ1IjoiYWJoaXJhc3RvZ2k4MDAiLCJhIjoiY21seDkzdTh3MGp2eTNkb2oyZWM2ZDZiZCJ9.aBgaZF9WCksZNbiDeXs5DQ';
+  const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
 
   useEffect(() => {
     async function loadData() {
       try {
-        const response = await fetch('/zipcode-data.csv');
+        const response = await fetch('/api/occupancy-choropleth');
         if (!response.ok) {
-          throw new Error('Failed to load CSV data');
+          throw new Error('Failed to load occupancy map data');
         }
-        const csvText = await response.text();
-        const parsed = parseCSV(csvText);
-        setZipcodeData(parsed);
+        const data = (await response.json()) as OccupancyChoroplethPayload;
+        setPayload(data);
         setIsLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -52,10 +54,10 @@ export function MapPanel() {
           </div>
           <div>
             <h2 className="text-sm font-bold" style={{ color: "#1e2533" }}>
-              US Housing Market Overview
+              US Housing Units Choropleth
             </h2>
             <p className="text-xs" style={{ color: "#8b93a7" }}>
-              Click on a zipcode to zoom in, hover to view details
+              Pastel heatmap by ZCTA with per-year normalized values
             </p>
           </div>
         </div>
@@ -83,7 +85,13 @@ export function MapPanel() {
             </div>
           </div>
         ) : (
-          <MapBoxMap data={zipcodeData} mapboxToken={MAPBOX_TOKEN} />
+          payload && (
+            <MapBoxMap
+              geojson={payload.geojson}
+              years={payload.years}
+              mapboxToken={MAPBOX_TOKEN}
+            />
+          )
         )}
       </div>
     </div>
