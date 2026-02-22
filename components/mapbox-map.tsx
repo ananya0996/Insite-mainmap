@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import Map, { Layer, Source, MapRef, CircleLayer } from 'react-map-gl';
+import Map, { Layer, Source, MapRef } from 'react-map-gl';
+import type { CircleLayer } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { ZipcodeData } from '@/lib/csv-parser';
 import { Search, ZoomIn, ZoomOut, Home } from 'lucide-react';
@@ -140,35 +141,6 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
     return '#ef4444'; // Red
   };
 
-  // Heatmap layer style
-  const heatmapLayer = {
-    id: 'zipcode-heatmap',
-    type: 'circle' as const,
-    paint: {
-      'circle-radius': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        4, 8,
-        12, 20
-      ],
-      'circle-color': [
-        'interpolate',
-        ['linear'],
-        ['get', 'overall_score'],
-        70, '#ef4444',
-        75, '#f97316',
-        80, '#fbbf24',
-        85, '#60a5fa',
-        90, '#3b82f6',
-        95, '#1e3a8a'
-      ],
-      'circle-opacity': 0.7,
-      'circle-stroke-width': 1,
-      'circle-stroke-color': '#ffffff'
-    }
-  };
-
   return (
     <div className="relative h-full w-full">
       {/* Search Bar */}
@@ -268,7 +240,33 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
         onMouseLeave={handleMouseLeave}
       >
         <Source id="zipcode-data" type="geojson" data={geojsonData}>
-          <Layer {...heatmapLayer} />
+          <Layer 
+            id="zipcode-heatmap"
+            type="circle"
+            paint={{
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                4, 8,
+                12, 20
+              ],
+              'circle-color': [
+                'interpolate',
+                ['linear'],
+                ['get', 'overall_score'],
+                70, '#ef4444',
+                75, '#f97316',
+                80, '#fbbf24',
+                85, '#60a5fa',
+                90, '#3b82f6',
+                95, '#1e3a8a'
+              ],
+              'circle-opacity': 0.7,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#ffffff'
+            }}
+          />
         </Source>
       </Map>
 
