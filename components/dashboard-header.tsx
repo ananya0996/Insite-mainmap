@@ -1,45 +1,73 @@
 import Image from "next/image";
-import { MapPin, BarChart3, TrendingUp } from "lucide-react";
+import { MapPin, BarChart3, TrendingUp, Search } from "lucide-react";
 
 export function DashboardHeader() {
   return (
-    <header className="flex items-center justify-between border-b border-border px-6 py-3">
+    <header
+      className="flex items-center justify-between px-6 py-3"
+      style={{ backgroundColor: "#ffffff", borderBottom: "1px solid #dde1ea", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+    >
       <div className="flex items-center gap-3">
         <Image
           src="/images/insite-logo.jpg"
           alt="Insite logo"
           width={32}
           height={32}
-          className="rounded"
+          className="rounded-lg"
         />
-        <h1 className="text-lg font-semibold tracking-tight text-foreground">
+        <h1 className="text-lg font-bold tracking-tight" style={{ color: "#1e2533" }}>
           Insite
         </h1>
-        <span className="ml-1 rounded-sm bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">
+        <span
+          className="ml-1 rounded-md px-2.5 py-0.5 text-xs font-semibold"
+          style={{ backgroundColor: "#edf2ff", color: "#4a90d9" }}
+        >
           Dashboard
         </span>
       </div>
 
-      <nav className="flex items-center gap-6">
-        <button className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+      <div
+        className="flex items-center gap-1 rounded-xl px-4 py-2"
+        style={{ backgroundColor: "#f0f2f7", border: "1px solid #e3e6ed" }}
+      >
+        <Search className="h-4 w-4" style={{ color: "#8b93a7" }} />
+        <span className="ml-1 text-sm" style={{ color: "#8b93a7" }}>
+          Search zip codes, metrics...
+        </span>
+      </div>
+
+      <nav className="flex items-center gap-1">
+        <button
+          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
+          style={{ backgroundColor: "#edf2ff", color: "#4a90d9" }}
+        >
           <MapPin className="h-4 w-4" />
           <span>Zip Codes</span>
         </button>
-        <button className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+        <button
+          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-gray-100"
+          style={{ color: "#6b7385" }}
+        >
           <BarChart3 className="h-4 w-4" />
           <span>Analytics</span>
         </button>
-        <button className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+        <button
+          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-gray-100"
+          style={{ color: "#6b7385" }}
+        >
           <TrendingUp className="h-4 w-4" />
           <span>Trends</span>
         </button>
       </nav>
 
       <div className="flex items-center gap-3">
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs" style={{ color: "#8b93a7" }}>
           Last updated: Feb 2026
         </span>
-        <div className="h-2 w-2 rounded-full bg-emerald-500" />
+        <div
+          className="h-2.5 w-2.5 rounded-full"
+          style={{ backgroundColor: "#34b87c", boxShadow: "0 0 6px rgba(52,184,124,0.4)" }}
+        />
       </div>
     </header>
   );

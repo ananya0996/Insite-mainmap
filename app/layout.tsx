@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0f1a",
+  themeColor: "#ebeef4",
   width: "device-width",
   initialScale: 1,
 };
@@ -30,8 +30,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+    <html
+      lang="en"
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      style={{ backgroundColor: "#e8ecf3", color: "#232a36" }}
+    >
+      <body
+        className="font-sans antialiased"
+        style={{ backgroundColor: "#e8ecf3", color: "#232a36" }}
+      >
+        {children}
+      </body>
     </html>
   );
 }

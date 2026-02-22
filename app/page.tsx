@@ -29,24 +29,28 @@ const employedWorkersData = [
 
 export default function DashboardPage() {
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div
+      className="flex h-screen flex-col overflow-hidden"
+      style={{ backgroundColor: "#e8ecf3", color: "#232a36" }}
+    >
       <DashboardHeader />
 
-      <main className="flex flex-1 gap-4 overflow-hidden p-4">
+      <main className="flex flex-1 gap-5 overflow-hidden p-5">
         {/* Left: US Map */}
         <section className="flex-[3] min-w-0">
           <MapPanel />
         </section>
 
         {/* Right: 3 stacked charts */}
-        <aside className="flex flex-[1.2] min-w-0 flex-col gap-4">
+        <aside className="flex flex-[1.2] min-w-0 flex-col gap-5">
           <div className="flex-1 min-h-0">
             <ChartPanel
               title="Median Household Income"
               subtitle="Top zip codes by annual income"
               icon={<DollarSign className="h-4 w-4" />}
               data={householdIncomeData}
-              accentColor="bg-accent"
+              accentColor="bg-blue-50 text-blue-600"
+              barColor="#4a90d9"
             />
           </div>
 
@@ -56,7 +60,8 @@ export default function DashboardPage() {
               subtitle="Net migration by zip code (annual)"
               icon={<Users className="h-4 w-4" />}
               data={populationInfluxData}
-              accentColor="bg-amber-500"
+              accentColor="bg-amber-50 text-amber-600"
+              barColor="#e5963b"
             />
           </div>
 
@@ -66,7 +71,8 @@ export default function DashboardPage() {
               subtitle="Active workforce per zip code"
               icon={<Briefcase className="h-4 w-4" />}
               data={employedWorkersData}
-              accentColor="bg-emerald-500"
+              accentColor="bg-emerald-50 text-emerald-600"
+              barColor="#34b87c"
             />
           </div>
         </aside>
