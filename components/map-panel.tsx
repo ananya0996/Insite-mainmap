@@ -11,7 +11,7 @@ export function MapPanel() {
   const [error, setError] = useState<string | null>(null);
 
   // Replace with your actual Mapbox token
-  const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZXhhbXBsZSIsImEiOiJjbGV4YW1wbGUifQ.example';
+  const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'INVALID_API_KEY';
 
   useEffect(() => {
     async function loadData() {
