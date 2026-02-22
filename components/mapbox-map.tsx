@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Map, { Layer, Source, MapRef } from 'react-map-gl';
-import type { CircleLayer } from 'react-map-gl';
+import type { CircleLayer, FillLayer, LineLayer } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { ZipcodeData } from '@/lib/csv-parser';
+import { fetchAllZipcodeGeoJSON, ZipcodeGeoJSON } from '@/lib/geojson-loader';
 import { Search, ZoomIn, ZoomOut, Home } from 'lucide-react';
 
 interface MapBoxMapProps {
@@ -24,6 +25,19 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+  const [zipcodeGeoJSON, setZipcodeGeoJSON] = useState<ZipcodeGeoJSON | null>(null);
+  const [isLoadingGeoJSON, setIsLoadingGeoJSON] = useState(true);
+
+  // Load all zipcode boundary GeoJSON files
+  useEffect(() => {
+    async function loadGeoJSON() {
+      setIsLoadingGeoJSON(true);
+      const geoJSON = await fetchAllZipcodeGeoJSON();
+      setZipcodeGeoJSON(geoJSON);
+      setIsLoadingGeoJSON(false);
+    }
+    loadGeoJSON();
+  }, []);
 
   // Create GeoJSON from CSV data
   const geojsonData = {
@@ -143,6 +157,19 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
 
   return (
     <div className="relative h-full w-full">
+      {/* GeoJSON Loading Indicator */}
+      {isLoadingGeoJSON && (
+        <div className="absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white px-6 py-4 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+            <div className="text-sm">
+              <div className="font-semibold text-gray-900">Loading zipcode boundaries...</div>
+              <div className="text-xs text-gray-500">Fetching GeoJSON data for all states</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search Bar */}
       <div className="absolute left-4 top-4 z-10 w-80">
         <div className="relative">
@@ -234,11 +261,42 @@ export function MapBoxMap({ data, mapboxToken }: MapBoxMapProps) {
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/light-v11"
         mapboxAccessToken={mapboxToken}
-        interactiveLayerIds={['zipcode-heatmap']}
+        interactiveLayerIds={['zipcode-heatmap', 'zipcode-boundaries-fill']}
         onClick={handleMapClick}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
+        {/* Zipcode Boundary Polygons */}
+        {zipcodeGeoJSON && !isLoadingGeoJSON && (
+          <Source id="zipcode-boundaries" type="geojson" data={zipcodeGeoJSON}>
+            <Layer 
+              id="zipcode-boundaries-fill"
+              type="fill"
+              paint={{
+                'fill-color': '#4a90d9',
+                'fill-opacity': 0.1
+              }}
+            />
+            <Layer 
+              id="zipcode-boundaries-line"
+              type="line"
+              paint={{
+                'line-color': '#4a90d9',
+                'line-width': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  4, 0.3,
+                  8, 0.5,
+                  12, 1
+                ],
+                'line-opacity': 0.4
+              }}
+            />
+          </Source>
+        )}
+
+        {/* Zipcode Point Data */}
         <Source id="zipcode-data" type="geojson" data={geojsonData}>
           <Layer 
             id="zipcode-heatmap"
