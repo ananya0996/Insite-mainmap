@@ -9,7 +9,7 @@ export function DashboardHeader() {
     >
       <div className="flex items-center gap-3">
         <Image
-          src="/images/insite-logo.jpg"
+          src="/insite_logo.png"
           alt="Insite logo"
           width={32}
           height={32}
