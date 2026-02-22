@@ -11,7 +11,8 @@ export function MapPanel() {
   const [error, setError] = useState<string | null>(null);
 
   // TODO: we know that hardcoding an API key is incredibly stupid, but we are prioritizing successful deployment for a hackathon over debugging deployment issues due to secret management
-  const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiYWJoaXJhc3RvZ2k4MDAiLCJhIjoiY21seDkzdTh3MGp2eTNkb2oyZWM2ZDZiZCJ9.aBgaZF9WCksZNbiDeXs5DQ';
+  // const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiYWJoaXJhc3RvZ2k4MDAiLCJhIjoiY21seDkzdTh3MGp2eTNkb2oyZWM2ZDZiZCJ9.aBgaZF9WCksZNbiDeXs5DQ';
+  const MAPBOX_TOKEN = 'pk.eyJ1IjoiYWJoaXJhc3RvZ2k4MDAiLCJhIjoiY21seDkzdTh3MGp2eTNkb2oyZWM2ZDZiZCJ9.aBgaZF9WCksZNbiDeXs5DQ';
 
   useEffect(() => {
     async function loadData() {
